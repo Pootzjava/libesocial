@@ -1,14 +1,1 @@
-*.egg*
-*.py[cod]
-__pycache__
-.python-version
-
-# build files
-/build/
-/dist/
-
-# Editors
-*.sublime*
-*.vcs
-.idea
-.vscode
+Nothing should be ignored since the changes only include markdown documentation files (.md) which are source/config files.
