@@ -16,8 +16,12 @@ import os
 import datetime
 import logging
 import traceback
+import time
+from functools import wraps
 
 import requests
+import structlog
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
@@ -30,6 +34,7 @@ from esocial.utils import (
     pkcs12_data,
     encrypt_pem_file,
 )
+from esocial import metrics
 
 import zeep
 from zeep import xsd
@@ -38,6 +43,7 @@ from zeep.transports import Transport
 from lxml import etree
 
 logger = logging.getLogger(__name__)
+struct_logger = structlog.get_logger(__name__)
 
 here = os.path.abspath(os.path.dirname(__file__))
 serpro_ca_bundle = os.path.join(here, 'certs', 'serpro_full_chain.pem')
@@ -64,6 +70,38 @@ class CustomHTTPSAdapter(HTTPAdapter):
     def proxy_manager_for(self, *args, **kwargs):
         kwargs['ssl_context'] = self._configure_ssl_context()
         return super(CustomHTTPSAdapter, self).proxy_manager_for(*args, **kwargs)
+
+
+def retry_on_failure(func):
+    """Decorator to add automatic retry with exponential backoff.
+    
+    Retries on common transient failures:
+    - Connection errors
+    - Timeout errors
+    - Server errors (5xx)
+    """
+    @wraps(func)
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((requests.exceptions.ConnectionError, 
+                                       requests.exceptions.Timeout,
+                                       zeep.exceptions.TransportError)),
+        reraise=True
+    )
+    def wrapper(*args, **kwargs):
+        struct_logger.info("operation_start", operation=func.__name__)
+        try:
+            result = func(*args, **kwargs)
+            struct_logger.info("operation_success", operation=func.__name__)
+            return result
+        except Exception as e:
+            struct_logger.error("operation_failed", 
+                              operation=func.__name__, 
+                              error=str(e),
+                              exc_info=True)
+            raise
+    return wrapper
 
 
 class WSClient(object):
@@ -216,46 +254,107 @@ class WSClient(object):
             event_root.append(event_tag)
         return batch_envelop.root
 
+    @retry_on_failure
     def send(self, group_id=1, clear_batch=True):
         batch_to_send = self._make_send_envelop(group_id)
-        logger.info(f"Tentando validar o XML batch_to_send:"
-                    f" group_id {group_id}, batch_to_send: {str(batch_to_send)}")
+        struct_logger.info("validating_batch", 
+                          group_id=group_id, 
+                          batch_size=len(self.batch),
+                          target=self.target)
+        metrics.BATCH_SIZE.labels(target=self.target).observe(len(self.batch))
+        metrics.BATCH_SUBMISSIONS.labels(target=self.target).inc()
+        
         try:
             self.validate_envelop('send', batch_to_send)
+            struct_logger.info("batch_validation_success", group_id=group_id)
         except Exception as e:
-            logger.error(f"XML inválido: {e}, batch_to_send: {str(batch_to_send)}", exc_info=True)
-            logger.error("Traceback completo: " + traceback.format_exc())
+            struct_logger.error("batch_validation_failed", 
+                               group_id=group_id, 
+                               error=str(e),
+                               exc_info=True)
+            metrics.EVENTS_FAILURE.labels(
+                event_type='batch_validation',
+                target=self.target,
+                error_type=type(e).__name__
+            ).inc()
+            raise
 
         # If no exception, batch XML is valid
         url = esocial._WS_URL[self.target]['send']
-        ws = self.connect(url)
-        # ws.wsdl.dump()
-        BatchElement = ws.get_element('ns1:EnviarLoteEventos')
-        result = ws.service.EnviarLoteEventos(BatchElement(loteEventos=batch_to_send))
-        del ws
-        if clear_batch:
-            self.clear_batch()
-        # result and batch_to_send is a lxml Element object
-        return (result, batch_to_send)
+        struct_logger.info("connecting_to_webservice", url=url)
+        metrics.ACTIVE_CONNECTIONS.inc()
+        try:
+            ws = self.connect(url)
+            # ws.wsdl.dump()
+            BatchElement = ws.get_element('ns1:EnviarLoteEventos')
+            
+            # Track individual events
+            for event in self.batch:
+                event_tag = event.getroot().getchildren()[0]
+                event_type = event_tag.tag.split('}')[-1] if '}' in event_tag.tag else event_tag.tag
+                metrics.EVENTS_SUBMITTED.labels(
+                    event_type=event_type,
+                    target=self.target
+                ).inc()
+            
+            start_time = time.time()
+            result = ws.service.EnviarLoteEventos(BatchElement(loteEventos=batch_to_send))
+            duration = time.time() - start_time
+            
+            struct_logger.info("send_success", 
+                              duration_seconds=duration,
+                              group_id=group_id)
+            
+            # Track success
+            for event in self.batch:
+                event_tag = event.getroot().getchildren()[0]
+                event_type = event_tag.tag.split('}')[-1] if '}' in event_tag.tag else event_tag.tag
+                metrics.EVENTS_SUCCESS.labels(
+                    event_type=event_type,
+                    target=self.target
+                ).inc()
+                
+            del ws
+            if clear_batch:
+                self.clear_batch()
+            # result and batch_to_send is a lxml Element object
+            return (result, batch_to_send)
+        finally:
+            metrics.ACTIVE_CONNECTIONS.dec()
 
+    @retry_on_failure
     def send_file(self, xml_content, clear_batch=True):
         # Converte a string xml_content em um objeto XML (Element)
         batch_to_send = etree.fromstring(xml_content)
+        struct_logger.info("send_file_start", 
+                          content_length=len(xml_content),
+                          target=self.target)
+        metrics.BATCH_SUBMISSIONS.labels(target=self.target).inc()
 
         # Caso necessário, valide o envelope
         # self.validate_envelop('send', batch_to_send)
-
+        
         url = esocial._WS_URL[self.target]['send']
-        ws = self.connect(url)
-        BatchElement = ws.get_element('ns1:EnviarLoteEventos')
-        result = ws.service.EnviarLoteEventos(BatchElement(loteEventos=batch_to_send))
+        metrics.ACTIVE_CONNECTIONS.inc()
+        try:
+            ws = self.connect(url)
+            BatchElement = ws.get_element('ns1:EnviarLoteEventos')
+            
+            start_time = time.time()
+            result = ws.service.EnviarLoteEventos(BatchElement(loteEventos=batch_to_send))
+            duration = time.time() - start_time
+            
+            struct_logger.info("send_file_success", 
+                              duration_seconds=duration)
+            
+            del ws
+            if clear_batch:
+                self.clear_batch()
 
-        del ws
-        if clear_batch:
-            self.clear_batch()
-
-        # result e batch_to_send são objetos do tipo lxml.etree.Element
-        return (result, batch_to_send)
+            # result e batch_to_send são objetos do tipo lxml.etree.Element
+            return (result, batch_to_send)
+        finally:
+            metrics.ACTIVE_CONNECTIONS.dec()
 
     def _make_retrieve_envelop(self, protocol_number):
         version = format_xsd_version(esocial.__xsd_versions__['retrieve']['version'])
@@ -265,17 +364,33 @@ class WSClient(object):
         envelop_h.add_element('consultaLoteEventos', 'protocoloEnvio', text=str(protocol_number))
         return envelop_h.root
 
+    @retry_on_failure
     def retrieve(self, protocol_number):
         batch_to_search = self._make_retrieve_envelop(protocol_number)
+        struct_logger.info("retrieve_start", 
+                          protocol_number=protocol_number,
+                          target=self.target)
+        
         self.validate_envelop('retrieve', batch_to_search)
         # if no exception, protocol XML is valid
         url = esocial._WS_URL[self.target]['retrieve']
-        ws = self.connect(url)
-        # ws.wsdl.dump()
-        SearchElement = ws.get_element('ns1:ConsultarLoteEventos')
-        result = ws.service.ConsultarLoteEventos(SearchElement(consulta=batch_to_search))
-        del ws
-        return result
+        metrics.ACTIVE_CONNECTIONS.inc()
+        try:
+            ws = self.connect(url)
+            # ws.wsdl.dump()
+            SearchElement = ws.get_element('ns1:ConsultarLoteEventos')
+            
+            start_time = time.time()
+            result = ws.service.ConsultarLoteEventos(SearchElement(consulta=batch_to_search))
+            duration = time.time() - start_time
+            
+            struct_logger.info("retrieve_success", 
+                              protocol_number=protocol_number,
+                              duration_seconds=duration)
+            del ws
+            return result
+        finally:
+            metrics.ACTIVE_CONNECTIONS.dec()
 
     def _make_employer_events_ids_evelop(self, params):
         version = format_xsd_version(esocial.__xsd_versions__['view_employer_event_id']['version'])

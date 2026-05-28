@@ -11,9 +11,11 @@ install_requires = [
     'lxml>=4.6.3',
     'zeep>=4.1.0',
     'signxml>=3.1.0',
-    'pyOpenSSL>=22.1.0',
+    'cryptography>=35.0.0',
     'dotmap>=1.3.24',
-    'six>=1.11.0',
+    'structlog>=21.1.0',
+    'tenacity>=8.0.0',
+    'prometheus-client>=0.11.0',
 ]
 
 
@@ -45,13 +47,16 @@ setup(
     install_requires=install_requires,
     zip_safe=False,
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
     ],
 )
 
