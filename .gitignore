@@ -5,24 +5,16 @@ __pycache__/
 *.pyo
 *.pyd
 *.egg-info/
-
-# Dependencies
-venv/
+.eggs/
 .venv/
+venv/
 .env
 .env.local
-*.env.*
+.env.*
 
-# Logs and temporary files
-*.log
-*.tmp
-*.swp
-
-# Editors
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
+# Build/dist files
+build/
+dist/
+*.egg
+*.whl
 ```
