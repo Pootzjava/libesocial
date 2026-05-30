@@ -12,15 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-import six
 import os
 import tempfile
 import contextlib
+import logging
 
-# from OpenSSL import crypto
+import structlog
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
+
+logger = logging.getLogger(__name__)
+struct_logger = structlog.get_logger(__name__)
 
 def format_xsd_version(str_version):
     chars_to_transform = '.-'
