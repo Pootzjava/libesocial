@@ -1,49 +1,29 @@
-```
+```gitignore
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-env/
-venv/
+
+# Dependencies
 .venv/
-.eggs/
-*.egg-info/
-.egg/
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-coverage/
-
-# Distribution / packaging
-dist/
-build/
-*.egg
-*.tar.gz
-*.whl
--pip-wheel-metadata/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+venv/
+env/
+.env
+.env.local
+.env.*
 
 # Logs
 *.log
 
-# Environment
-.env
-.env.local
-*.env.*
+# Tests
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Temporary files
-*.tmp
+# Build/dist
+build/
+dist/
+*.egg-info/
 ```

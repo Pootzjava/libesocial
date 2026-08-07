@@ -37,6 +37,7 @@ class BatchStatusEnum(str, Enum):
     PROCESSING = "PROCESSANDO"
     SENT = "ENVIADO"
     SUCCESS = "SUCESSO"
+    FAILED = "FALHA"
     ERROR = "ERRO"
     CANCELLED = "CANCELADO"
 

@@ -71,9 +71,9 @@ def validate(ctx, xml_file: str, event_type: str, strict: bool):
         task = progress.add_task(f"Validating [bold cyan]{xml_path.name}[/]", total=None)
         
         try:
-            from esocial.validator import XMLValidator
-            validator = XMLValidator(event_type=event_type, strict=strict)
-            is_valid, errors = validator.validate_file(xml_path)
+            from esocial.xml import XMLValidate
+            validator = XMLValidate(event_type=event_type, strict=strict)
+            is_valid, errors = validator.validate_file(str(xml_path))
             
             progress.update(task, completed=True)
             
