@@ -67,7 +67,7 @@ class TestCLI:
             assert result.exit_code == 1
             assert 'Invalid XML' in result.output
     
-    @patch('esocial.async_client.AsyncESocialClient')
+    @patch('esocial.cli.ESocialAsyncClient')
     def test_submit_dry_run(self, mock_client_class):
         """Test submit with dry-run"""
         mock_client = AsyncMock()
@@ -84,7 +84,7 @@ class TestCLI:
             assert result.exit_code == 0
             assert 'Would submit' in result.output
     
-    @patch('esocial.async_client.AsyncESocialClient')
+    @patch('esocial.cli.ESocialAsyncClient')
     def test_submit_success(self, mock_client_class):
         """Test successful submission"""
         call_tracker = {'called': False, 'result': None}
@@ -96,9 +96,9 @@ class TestCLI:
         mock_client = MagicMock()
         mock_client.send_event = mock_send
         
-        async def __aenter__():
+        async def __aenter__(self):
             return mock_client
-        async def __aexit__(exc_type, exc_val, exc_tb):
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
         mock_client.__aenter__ = __aenter__
         mock_client.__aexit__ = __aexit__
@@ -114,7 +114,7 @@ class TestCLI:
             # Just check it ran without critical errors - actual HTTP calls may fail in test env
             assert result.exit_code == 0 or 'Failed' in result.output or 'Success' in result.output
     
-    @patch('esocial.async_client.AsyncESocialClient')
+    @patch('esocial.cli.ESocialAsyncClient')
     def test_status_check(self, mock_client_class):
         """Test status check"""
         async def mock_check(receipt_number):
@@ -127,9 +127,9 @@ class TestCLI:
         mock_client = MagicMock()
         mock_client.check_status = mock_check
         
-        async def __aenter__():
+        async def __aenter__(self):
             return mock_client
-        async def __aexit__(exc_type, exc_val, exc_tb):
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
         mock_client.__aenter__ = __aenter__
         mock_client.__aexit__ = __aexit__
@@ -141,7 +141,7 @@ class TestCLI:
         # Status check may fail due to network in test env, but should complete
         assert result.exit_code == 0 or 'status' in result.output.lower() or result.exit_code in [0, 1]
     
-    @patch('esocial.async_client.AsyncESocialClient')
+    @patch('esocial.cli.ESocialAsyncClient')
     def test_returns_query(self, mock_client_class):
         """Test returns query"""
         async def mock_download(from_date=None, to_date=None, event_type=None):
@@ -152,9 +152,9 @@ class TestCLI:
         mock_client = MagicMock()
         mock_client.download_returns = mock_download
         
-        async def __aenter__():
+        async def __aenter__(self):
             return mock_client
-        async def __aexit__(exc_type, exc_val, exc_tb):
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
         mock_client.__aenter__ = __aenter__
         mock_client.__aexit__ = __aexit__
@@ -187,7 +187,7 @@ class TestCLI:
         assert result.exit_code == 0
         assert 'Audit Logs' in result.output
     
-    @patch('esocial.async_client.AsyncESocialClient')
+    @patch('esocial.cli.ESocialAsyncClient')
     @patch('esocial.secrets.SecretsManager')
     def test_health_check_success(self, mock_secrets_class, mock_client_class):
         """Test health check - all systems operational"""
@@ -198,9 +198,9 @@ class TestCLI:
         mock_client = MagicMock()
         mock_client.health_check = mock_health
         
-        async def __aenter__():
+        async def __aenter__(self):
             return mock_client
-        async def __aexit__(exc_type, exc_val, exc_tb):
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
         mock_client.__aenter__ = __aenter__
         mock_client.__aexit__ = __aexit__
@@ -251,7 +251,7 @@ class TestCLIBatchSubmission:
     def setup_method(self):
         self.runner = CliRunner()
     
-    @patch('esocial.async_client.AsyncESocialClient')
+    @patch('esocial.cli.ESocialAsyncClient')
     def test_batch_file_submission(self, mock_client_class):
         """Test submission from batch file"""
         async def mock_send(event_type, xml_path):
@@ -260,9 +260,9 @@ class TestCLIBatchSubmission:
         mock_client = MagicMock()
         mock_client.send_event = mock_send
         
-        async def __aenter__():
+        async def __aenter__(self):
             return mock_client
-        async def __aexit__(exc_type, exc_val, exc_tb):
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
         mock_client.__aenter__ = __aenter__
         mock_client.__aexit__ = __aexit__
@@ -292,7 +292,7 @@ class TestCLIBatchSubmission:
             # For now, just check it completed successfully
             assert result.exit_code == 0
     
-    @patch('esocial.async_client.AsyncESocialClient')
+    @patch('esocial.cli.ESocialAsyncClient')
     def test_batch_partial_failure(self, mock_client_class):
         """Test batch with partial failures"""
         call_tracker = {'calls': []}
@@ -307,9 +307,9 @@ class TestCLIBatchSubmission:
         mock_client = MagicMock()
         mock_client.send_event = side_effect
         
-        async def __aenter__():
+        async def __aenter__(self):
             return mock_client
-        async def __aexit__(exc_type, exc_val, exc_tb):
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
         mock_client.__aenter__ = __aenter__
         mock_client.__aexit__ = __aexit__
@@ -341,7 +341,7 @@ class TestCLIReturns:
     def setup_method(self):
         self.runner = CliRunner()
     
-    @patch('esocial.async_client.AsyncESocialClient')
+    @patch('esocial.cli.ESocialAsyncClient')
     def test_returns_json_format(self, mock_client_class):
         """Test returns in JSON format"""
         async def mock_download(from_date=None, to_date=None, event_type=None):
@@ -352,9 +352,9 @@ class TestCLIReturns:
         mock_client = MagicMock()
         mock_client.download_returns = mock_download
         
-        async def __aenter__():
+        async def __aenter__(self):
             return mock_client
-        async def __aexit__(exc_type, exc_val, exc_tb):
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
         mock_client.__aenter__ = __aenter__
         mock_client.__aexit__ = __aexit__
@@ -367,7 +367,7 @@ class TestCLIReturns:
         data = json.loads(result.output)
         assert isinstance(data, list)
     
-    @patch('esocial.async_client.AsyncESocialClient')
+    @patch('esocial.cli.ESocialAsyncClient')
     def test_returns_filter_by_type(self, mock_client_class):
         """Test returns filtered by event type"""
         call_args = {}
@@ -381,9 +381,9 @@ class TestCLIReturns:
         mock_client = MagicMock()
         mock_client.download_returns = mock_download
         
-        async def __aenter__():
+        async def __aenter__(self):
             return mock_client
-        async def __aexit__(exc_type, exc_val, exc_tb):
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
         mock_client.__aenter__ = __aenter__
         mock_client.__aexit__ = __aexit__
@@ -402,7 +402,7 @@ class TestCLIAudit:
     def setup_method(self):
         self.runner = CliRunner()
     
-    @patch('esocial.audit.AuditLogger')
+    @patch('esocial.cli.AuditLogger')
     def test_audit_filter_by_severity(self, mock_logger_class):
         """Test audit logs filtered by severity"""
         mock_logger = MagicMock()
@@ -416,18 +416,18 @@ class TestCLIAudit:
         call_kwargs = mock_logger.query_logs.call_args[1]
         assert call_kwargs['severity'] == 'ERROR'
     
-    @patch('esocial.audit.AuditLogger')
+    @patch('esocial.cli.AuditLogger')
     def test_audit_filter_by_event_type(self, mock_logger_class):
         """Test audit logs filtered by event type"""
         mock_logger = MagicMock()
         mock_logger.query_logs.return_value = []
         mock_logger_class.return_value = mock_logger
         
-        result = self.runner.invoke(cli, ['audit', '-e', 'SUBMISSION'])
+        result = self.runner.invoke(cli, ['audit', '-e', 'EVENT_SUBMIT'])
         
         assert result.exit_code == 0
         call_kwargs = mock_logger.query_logs.call_args[1]
-        assert call_kwargs['event_type'] == 'SUBMISSION'
+        assert call_kwargs['event_type'] == 'EVENT_SUBMIT'
     
     @patch('esocial.audit.AuditLogger')
     def test_audit_json_export(self, mock_logger_class):

@@ -655,9 +655,9 @@ class AuditLogger:
         from datetime import timedelta
         
         if start_date is None:
-            start_date = datetime.now() - timedelta(days=30)
+            start_date = datetime.now(timezone.utc) - timedelta(days=30)
         if end_date is None:
-            end_date = datetime.now()
+            end_date = datetime.now(timezone.utc)
         
         # Converte strings para enums se necessário
         event_type_enum = None

@@ -319,11 +319,11 @@ def audit(ctx, days: int, event_type: Optional[str], severity: Optional[str], fm
         esocial-cli audit -d 7
         esocial-cli audit -e SUBMISSION -s ERROR
     """
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     
     logger = AuditLogger(service_name='esocial-cli')
     
-    start_date = datetime.now() - timedelta(days=days)
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
     
     logs = logger.query_logs(
         start_date=start_date,
