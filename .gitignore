@@ -1,1 +1,14 @@
-(empty)
+```
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Tests
+.eslintcache
+.nyc_output/
+coverage/
+htmlcov/
+.coverage
+```
