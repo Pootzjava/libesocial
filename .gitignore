@@ -3,11 +3,6 @@
 *.pyc
 __pycache__/
 
-# Dependencies
-.venv/
-venv/
-node_modules/
-
 # Logs and temp files
 *.log
 *.tmp
@@ -16,14 +11,9 @@ node_modules/
 # Environment
 .env
 .env.local
-.env.*
+*.env.*
 
-# Editors
-.vscode/
-.idea/
-
-# Testing
-.pytest_cache/
+# Coverage
 .coverage
 coverage/
 htmlcov/
