@@ -393,12 +393,12 @@ class TestAsyncClientFactory:
 class TestAsyncClientRetry:
     """Testes de retry automático."""
     
-    @patch('esocial.async_client.httpx.AsyncClient.post')
-    async def test_retry_on_network_error(self, mock_post):
+    async def test_retry_on_network_error(self):
         """Testa retry em erro de rede."""
         call_count = [0]
         
-        def side_effect(*args, **kwargs):
+        # Criar um mock assíncrono que lança NetworkError nas primeiras 2 tentativas
+        async def mock_post_impl(*args, **kwargs):
             call_count[0] += 1
             if call_count[0] < 3:
                 raise httpx.NetworkError("Connection lost")
@@ -417,23 +417,27 @@ class TestAsyncClientRetry:
             mock_response.raise_for_status = MagicMock()
             return mock_response
         
-        mock_post.side_effect = side_effect
-        
         config = ESocialConfig(target=TargetEnum.TESTS)
         client = AsyncESocialClient(config=config, enable_persistence=False)
         
         await client.connect()
         
-        events = [{'id': 'evt1'}]
-        xml_content = "<lote>"
+        # Patch do método post diretamente no cliente
+        original_post = client._client.post
+        client._client.post = mock_post_impl
         
-        result = await client.send_batch("batch_1", events, xml_content)
-        
-        # Deve ter tentado 3 vezes (2 falhas + 1 sucesso)
-        assert call_count[0] == 3
-        assert result.success is True
-        
-        await client.disconnect()
+        try:
+            events = [{'id': 'evt1'}]
+            xml_content = "<lote>"
+            
+            result = await client.send_batch("batch_1", events, xml_content)
+            
+            # Deve ter tentado 3 vezes (2 falhas + 1 sucesso)
+            assert call_count[0] == 3
+            assert result.success is True
+        finally:
+            client._client.post = original_post
+            await client.disconnect()
 
 
 if __name__ == '__main__':
