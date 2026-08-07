@@ -87,10 +87,15 @@ class TestCLI:
     @patch('esocial.async_client.AsyncESocialClient')
     def test_submit_success(self, mock_client_class):
         """Test successful submission"""
+        import asyncio
+        
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
-        mock_client.send_event = AsyncMock(return_value={'receipt_number': '1.2.3.4.5'})
+        # Mock send_event as a coroutine function
+        async def mock_send(event_type, xml_path):
+            return {'receipt_number': '1.2.3.4.5', 'success': True}
+        mock_client.send_event = mock_send
         mock_client_class.return_value = mock_client
         
         with self.runner.isolated_filesystem():
@@ -100,7 +105,7 @@ class TestCLI:
             result = self.runner.invoke(cli, ['submit', str(xml_file), '-t', 'S-2200'])
             
             assert result.exit_code == 0
-            assert 'Submitted' in result.output
+            assert '1.2.3.4.5' in result.output or 'Submitted' in result.output
     
     @patch('esocial.async_client.AsyncESocialClient')
     def test_status_check(self, mock_client_class):

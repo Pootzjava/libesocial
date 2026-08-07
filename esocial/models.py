@@ -283,6 +283,11 @@ class ESocialConfig(BaseSettings):
     def is_tests(self) -> bool:
         """Verifica se está em ambiente de testes."""
         return self.target == TargetEnum.TESTS
+    
+    @classmethod
+    def from_env(cls) -> 'ESocialConfig':
+        """Cria configuração a partir de variáveis de ambiente."""
+        return cls()
 
 
 class WebServiceURLs(BaseModel):

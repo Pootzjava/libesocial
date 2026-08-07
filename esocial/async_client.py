@@ -501,3 +501,55 @@ async def create_async_client(
     
     await client.connect()
     return client
+
+
+async def send_event(
+    self,
+    event_type: str,
+    xml_path: str
+) -> Dict[str, Any]:
+    """
+    Envia um único evento (wrapper para CLI).
+    
+    Args:
+        event_type: Tipo do evento (ex: S-2200)
+        xml_path: Caminho para o arquivo XML
+        
+    Returns:
+        Dict com resultado do envio
+    """
+    import uuid
+    from pathlib import Path
+    
+    # Read XML content
+    xml_file = Path(xml_path)
+    if not xml_file.exists():
+        raise FileNotFoundError(f"XML file not found: {xml_path}")
+    
+    xml_content = xml_file.read_text()
+    
+    # Create batch with single event
+    batch_id = str(uuid.uuid4())
+    events = [{
+        'type': event_type,
+        'file': xml_path,
+        'content': xml_content
+    }]
+    
+    # Send batch
+    result = await self.send_batch(
+        batch_id=batch_id,
+        events=events,
+        xml_content=xml_content
+    )
+    
+    return {
+        'receipt_number': result.protocol_number if result.success else None,
+        'success': result.success,
+        'error': result.error_message if not result.success else None,
+        'batch_id': batch_id
+    }
+
+
+# Add method to class
+AsyncESocialClient.send_event = send_event
