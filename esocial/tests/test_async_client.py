@@ -166,7 +166,7 @@ class TestAsyncClientSendBatch:
         result = await client.send_batch("batch_1", events, xml_content)
         
         assert result.success is True
-        assert result.protocolo == "1234567890"
+        assert result.protocol == "1234567890"  # Usar 'protocol' em vez de 'protocolo'
         assert result.batch_id == "batch_1"
         
         await client.disconnect()

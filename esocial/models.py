@@ -248,21 +248,24 @@ class SendResult(BaseModel):
     """Resultado de envio de lote."""
     success: bool
     batch_id: str
-    protocol: Optional[str] = None
+    protocol: Optional[str] = Field(None, alias='protocolo', description="Protocolo de recebimento")
     response_data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     duration_seconds: float = 0.0
     events_sent: int = 0
     
-    model_config = ConfigDict(json_schema_extra={
-        'example': {
-            'success': True,
-            'batch_id': 'batch_1_1234567890',
-            'protocol': '1.2.3.4.5.6.7.8.9',
-            'duration_seconds': 2.5,
-            'events_sent': 10
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_schema_extra={
+            'example': {
+                'success': True,
+                'batch_id': 'batch_1_1234567890',
+                'protocol': '1.2.3.4.5.6.7.8.9',
+                'duration_seconds': 2.5,
+                'events_sent': 10
+            }
         }
-    })
+    )
 
 
 class HealthStatus(BaseModel):

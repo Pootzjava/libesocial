@@ -146,10 +146,35 @@ class AsyncESocialClient:
             self._connected = False
             logger.info("AsyncESocialClient disconnected")
     
+    async def _send_batch_internal(
+        self,
+        batch_id: str,
+        events: List[Dict[str, Any]],
+        xml_content: str
+    ) -> SendResult:
+        """Implementação interna do envio com retry."""
+        url = self._get_send_url()
+        headers = self._get_headers()
+        
+        # Enviar requisição SOAP
+        response = await self._client.post(
+            url,
+            content=xml_content.encode('utf-8'),
+            headers=headers,
+        )
+        
+        response.raise_for_status()
+        
+        # Processar resposta
+        result = self._parse_response(response.text, batch_id)
+        
+        logger.info(f"Batch {batch_id} sent successfully. Protocol: {result.protocol}")
+        return result
+    
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=retry_if_exception_type((httpx.NetworkError, httpx.TimeoutException)),
+        retry=retry_if_exception_type(httpx.HTTPError),
         reraise=True
     )
     async def send_batch(
@@ -190,21 +215,9 @@ class AsyncESocialClient:
             batch_state = PersistenceBatchState(batch_id=batch_id, events=events)
             self._persistence.save_batch(batch_state)
         
-        url = self._get_send_url()
-        headers = self._get_headers()
-        
         try:
-            # Enviar requisição SOAP
-            response = await self._client.post(
-                url,
-                content=xml_content.encode('utf-8'),
-                headers=headers,
-            )
-            
-            response.raise_for_status()
-            
-            # Processar resposta
-            result = self._parse_response(response.text, batch_id)
+            # Enviar requisição com retry automático
+            result = await self._send_batch_internal(batch_id, events, xml_content)
             
             # Atualizar persistência
             if self._persistence and result.success:
@@ -212,7 +225,6 @@ class AsyncESocialClient:
                 batch_state.response_data = {'protocol': result.protocol}
                 self._persistence.save_batch(batch_state)
             
-            logger.info(f"Batch {batch_id} sent successfully. Protocol: {result.protocol}")
             return result
             
         except httpx.HTTPStatusError as e:
@@ -227,6 +239,19 @@ class AsyncESocialClient:
                 # Mover eventos para DLQ
                 for event in events:
                     self._persistence.add_to_dlq(event, error_msg)
+            
+            raise AsyncSendError(error_msg, batch_id=batch_id, events=events)
+            
+        except httpx.HTTPError as e:
+            # Erros de rede - serão tratados pelo retry
+            # Se chegou aqui, é porque o retry esgotou
+            error_msg = f"Network error after retries: {str(e)}"
+            logger.error(error_msg)
+            
+            if self._persistence:
+                batch_state.status = 'FAILED'
+                batch_state.last_error = error_msg
+                self._persistence.save_batch(batch_state)
             
             raise AsyncSendError(error_msg, batch_id=batch_id, events=events)
             
