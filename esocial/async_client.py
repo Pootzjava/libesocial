@@ -222,7 +222,7 @@ class AsyncESocialClient:
             # Atualizar persistência
             if self._persistence and result.success:
                 batch_state.status = 'SUCCESS'
-                batch_state.response_data = {'protocol': result.protocol}
+                batch_state.response_data = {'protocolo': result.protocol}
                 self._persistence.save_batch(batch_state)
             
             return result
