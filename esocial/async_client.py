@@ -171,12 +171,6 @@ class AsyncESocialClient:
         logger.info(f"Batch {batch_id} sent successfully. Protocol: {result.protocol}")
         return result
     
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=retry_if_exception_type((httpx.HTTPError, httpx.RequestError)),
-        reraise=True
-    )
     async def send_batch(
         self,
         batch_id: str,
@@ -217,7 +211,7 @@ class AsyncESocialClient:
         
         try:
             # Enviar requisição com retry automático
-            result = await self._send_batch_internal(batch_id, events, xml_content)
+            result = await self._send_with_retry(batch_id, events, xml_content)
             
             # Atualizar persistência
             if self._persistence and result.success:
@@ -242,7 +236,7 @@ class AsyncESocialClient:
             
             raise AsyncSendError(error_msg, batch_id=batch_id, events=events)
             
-        except httpx.HTTPError as e:
+        except httpx.RequestError as e:
             # Erros de rede - serão tratados pelo retry
             # Se chegou aqui, é porque o retry esgotou
             error_msg = f"Network error after retries: {str(e)}"
@@ -266,6 +260,37 @@ class AsyncESocialClient:
             
             raise AsyncSendError(error_msg, batch_id=batch_id, events=events)
     
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
+        retry=retry_if_exception_type((httpx.HTTPError, httpx.RequestError)),
+        reraise=True
+    )
+    async def _send_with_retry(
+        self,
+        batch_id: str,
+        events: List[Dict[str, Any]],
+        xml_content: str
+    ) -> SendResult:
+        """Implementação interna do envio com retry."""
+        url = self._get_send_url()
+        headers = self._get_headers()
+        
+        # Enviar requisição SOAP
+        response = await self._client.post(
+            url,
+            content=xml_content.encode('utf-8'),
+            headers=headers,
+        )
+        
+        response.raise_for_status()
+        
+        # Processar resposta
+        result = self._parse_response(response.text, batch_id)
+        
+        logger.info(f"Batch {batch_id} sent successfully. Protocol: {result.protocol}")
+        return result
+    
     async def send_multiple_batches(
         self,
         batches: List[Tuple[str, List[Dict[str, Any]], str]]
@@ -277,7 +302,7 @@ class AsyncESocialClient:
             batches: Lista de tuplas (batch_id, events, xml_content)
             
         Returns:
-            Lista de SendResult para cada lote
+            Lista de SendResult para cada lote (apenas sucessos)
         """
         tasks = [
             self.send_batch(batch_id, events, xml)
@@ -300,6 +325,42 @@ class AsyncESocialClient:
         
         logger.info(f"Sent {len(successful)}/{len(batches)} batches successfully")
         return successful
+    
+    async def send_multiple_batches_with_errors(
+        self,
+        batches: List[Tuple[str, List[Dict[str, Any]], str]]
+    ) -> Tuple[List[SendResult], List[Tuple[str, Exception]]]:
+        """
+        Envia múltiplos lotes concorrentemente e retorna sucessos e falhas.
+        
+        Args:
+            batches: Lista de tuplas (batch_id, events, xml_content)
+            
+        Returns:
+            Tupla (successful_results, failed_batches) onde:
+            - successful_results: Lista de SendResult com sucesso
+            - failed_batches: Lista de tuplas (batch_id, exception)
+        """
+        tasks = [
+            self.send_batch(batch_id, events, xml)
+            for batch_id, events, xml in batches
+        ]
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        successful = []
+        failed = []
+        
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                failed.append((batches[i][0], result))
+                logger.error(f"Batch {batches[i][0]} failed: {result}")
+            else:
+                successful.append(result)
+                logger.info(f"Batch {batches[i][0]} succeeded: {result.protocol}")
+        
+        logger.info(f"Sent {len(successful)}/{len(batches)} batches successfully")
+        return successful, failed
     
     async def check_status(self, protocol: str) -> Dict[str, Any]:
         """

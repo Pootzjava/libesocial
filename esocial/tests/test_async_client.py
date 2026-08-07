@@ -284,16 +284,23 @@ class TestAsyncClientMultipleBatches:
     @patch('esocial.async_client.httpx.AsyncClient.post')
     async def test_send_multiple_batches_partial_failure(self, mock_post):
         """Testa envio com falhas parciais."""
-        call_count = [0]
+        call_count = {'batch_1': 0, 'batch_2': 0, 'batch_3': 0}
         
         def side_effect(*args, **kwargs):
-            call_count[0] += 1
-            if call_count[0] == 2:
+            # Descobrir qual batch está sendo chamado pelo conteúdo XML
+            content = kwargs.get('content', b'').decode('utf-8')
+            if '<lote1>' in content:
+                call_count['batch_1'] += 1
+            elif '<lote2>' in content:
+                call_count['batch_2'] += 1
+                # Sempre falha para batch_2
                 raise httpx.HTTPStatusError(
                     "500 Error",
                     request=MagicMock(),
                     response=MagicMock(status_code=500)
                 )
+            elif '<lote3>' in content:
+                call_count['batch_3'] += 1
             
             mock_response = MagicMock()
             mock_response.status_code = 200
@@ -301,11 +308,11 @@ class TestAsyncClientMultipleBatches:
             <soap:Envelope>
                 <soap:Body>
                     <EnviarLoteEventosResponse>
-                        <protocolo>PROTO{}</protocolo>
+                        <protocolo>PROTO</protocolo>
                     </EnviarLoteEventosResponse>
                 </soap:Body>
             </soap:Envelope>
-            """.format(call_count[0])
+            """
             mock_response.raise_for_status = MagicMock()
             return mock_response
         
@@ -322,10 +329,12 @@ class TestAsyncClientMultipleBatches:
             ("batch_3", [{'id': 'evt3'}], "<lote3>"),
         ]
         
-        results = await client.send_multiple_batches(batches)
+        results, failed = await client.send_multiple_batches_with_errors(batches)
         
-        # 2 sucessos, 1 falha
+        # 2 sucessos (batch_1 e batch_3), 1 falha (batch_2 após retries)
         assert len(results) == 2
+        assert len(failed) == 1
+        assert failed[0][0] == "batch_2"
         
         await client.disconnect()
 
@@ -397,11 +406,11 @@ class TestAsyncClientRetry:
         """Testa retry em erro de rede."""
         call_count = [0]
         
-        # Criar um mock assíncrono que lança NetworkError nas primeiras 2 tentativas
+        # Criar um mock assíncrono que lança RequestError nas primeiras 2 tentativas
         async def mock_post_impl(*args, **kwargs):
             call_count[0] += 1
             if call_count[0] < 3:
-                raise httpx.NetworkError("Connection lost")
+                raise httpx.RequestError("Connection lost")
             
             mock_response = MagicMock()
             mock_response.status_code = 200
