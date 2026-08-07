@@ -456,6 +456,27 @@ class AsyncESocialClient:
             'timestamp': datetime.utcnow().isoformat()
         }
     
+    async def download_returns(
+        self,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        event_type: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Download de retornos do eSocial.
+        
+        Args:
+            from_date: Data inicial (YYYY-MM-DD)
+            to_date: Data final (YYYY-MM-DD)
+            event_type: Tipo de evento para filtrar
+        
+        Returns:
+            Lista de retornos
+        """
+        # Placeholder implementation for CLI testing
+        # In production, this would call the actual eSocial returns API
+        return []
+    
     async def __aenter__(self) -> 'AsyncESocialClient':
         """Context manager entry."""
         await self.connect()

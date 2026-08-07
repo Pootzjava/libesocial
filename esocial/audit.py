@@ -468,7 +468,8 @@ class FileAuditBackend(AuditBackend):
 class AuditLogger:
     """Logger de auditoria principal."""
     
-    def __init__(self, config: Optional[AuditConfig] = None):
+    def __init__(self, config: Optional[AuditConfig] = None, service_name: Optional[str] = None):
+        # Ignore service_name for backwards compatibility
         self.config = config or AuditConfig.from_env()
         self.backend: AuditBackend = FileAuditBackend(self.config)
         self._buffer: List[AuditEvent] = []

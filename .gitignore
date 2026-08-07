@@ -12,27 +12,28 @@ __pycache__/
 # Environment
 .env
 .env.local
-.env.*
+*.env.*
+
+# Dependencies
+.venv/
+venv/
+node_modules/
+
+# Build artifacts
+dist/
+build/
+target/
+
+# Editors
+.vscode/
+.idea/
 
 # Coverage
 .coverage
 coverage/
 htmlcov/
 
-# MyPy
-.mypy_cache/
-
-# Pytest
+# Testing
 .pytest_cache/
-
-# VSCode
-.vscode/
-
-# IntelliJ/PyCharm
-.idea/
-
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
+.mypy_cache/
 ```
