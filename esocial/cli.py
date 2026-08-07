@@ -350,12 +350,19 @@ def audit(ctx, days: int, event_type: Optional[str], severity: Optional[str], fm
                 'CRITICAL': 'red bold'
             }.get(log.severity, 'white')
             
+            # Converte timestamp string para datetime se necessário
+            if isinstance(log.timestamp, str):
+                from datetime import datetime
+                ts = datetime.fromisoformat(log.timestamp.replace('Z', '+00:00'))
+            else:
+                ts = log.timestamp
+            
             table.add_row(
-                log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                log.event_type.value,
+                ts.strftime('%Y-%m-%d %H:%M:%S'),
+                log.event_type.value if hasattr(log.event_type, 'value') else str(log.event_type),
                 f"[{severity_style}]{log.severity}[/{severity_style}]",
-                log.user_id or 'system',
-                log.details[:50] + '...' if len(log.details) > 50 else log.details
+                getattr(log, 'user_id', None) or getattr(log, 'actor', 'system'),
+                log.details[:50] + '...' if len(str(log.details)) > 50 else str(log.details)
             )
         
         console.print(table)
