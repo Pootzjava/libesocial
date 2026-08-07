@@ -409,7 +409,13 @@ def health(ctx):
                 # Check 4: Audit Logger
                 progress.update(task, description="Checking audit logger...")
                 logger = AuditLogger(service_name='health-check')
-                logger.log(EventType.SYSTEM_HEALTH, "Health check executed", user_id='cli')
+                logger.log(
+                    event_type=EventType.SYSTEM_HEALTH,
+                    actor='cli',
+                    action='health_check',
+                    resource='system',
+                    resource_type='component'
+                )
                 audit_ok = True
                 progress.advance(task)
                 

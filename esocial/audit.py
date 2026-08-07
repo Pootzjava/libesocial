@@ -62,6 +62,7 @@ class AuditEventType(Enum):
     PERMISSION_CHANGE = "PERMISSION_CHANGE"
     SYSTEM_START = "SYSTEM_START"
     SYSTEM_STOP = "SYSTEM_STOP"
+    SYSTEM_HEALTH = "SYSTEM_HEALTH"
     
     # Segurança
     SECURITY_VIOLATION = "SECURITY_VIOLATION"
@@ -637,6 +638,58 @@ class AuditLogger:
             actor=actor,
             severity=severity,
             limit=limit
+        )
+    
+    def query_logs(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        event_type: Optional[str] = None,
+        severity: Optional[str] = None,
+        limit: int = 1000
+    ) -> List[AuditEvent]:
+        """
+        Método síncrono para consulta de logs de auditoria.
+        Usado principalmente pelo CLI e interfaces síncronas.
+        """
+        from datetime import timedelta
+        
+        if start_date is None:
+            start_date = datetime.now() - timedelta(days=30)
+        if end_date is None:
+            end_date = datetime.now()
+        
+        # Converte strings para enums se necessário
+        event_type_enum = None
+        if event_type:
+            try:
+                event_type_enum = AuditEventType(event_type)
+            except ValueError:
+                pass
+        
+        severity_enum = None
+        if severity:
+            try:
+                severity_enum = AuditSeverity(severity)
+            except ValueError:
+                pass
+        
+        # Executa a query assíncrona de forma síncrona
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        return loop.run_until_complete(
+            self.query(
+                start_date=start_date,
+                end_date=end_date,
+                event_type=event_type_enum,
+                severity=severity_enum,
+                limit=limit
+            )
         )
     
     async def verify_chain_integrity(self, events: List[AuditEvent]) -> bool:

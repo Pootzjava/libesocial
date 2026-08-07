@@ -284,6 +284,11 @@ class ESocialConfig(BaseSettings):
         """Verifica se está em ambiente de testes."""
         return self.target == TargetEnum.TESTS
     
+    def is_valid(self) -> bool:
+        """Verifica se a configuração é válida."""
+        # Validação básica - pode ser expandida
+        return self.target is not None and self.esocial_version is not None
+    
     @classmethod
     def from_env(cls) -> 'ESocialConfig':
         """Cria configuração a partir de variáveis de ambiente."""
