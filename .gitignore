@@ -8,27 +8,23 @@ __pycache__/
 env/
 venv/
 .venv/
-.venv-*/
+.eggs/
+*.egg-info/
+.egg/
 
 # Testing
-.coverage
-coverage/
-htmlcov/
 .pytest_cache/
-.mypy_cache/
+.coverage
+htmlcov/
+coverage/
 
 # Distribution / packaging
 dist/
 build/
-*.egg-info/
-.installed.cfg
 *.egg
-
-# Environment
-.env
-.env.local
-.env.*
-!.env.example
+*.tar.gz
+*.whl
+-pip-wheel-metadata/
 
 # IDE
 .vscode/
@@ -36,35 +32,18 @@ build/
 *.swp
 *.swo
 
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+*.env.*
+
 # OS
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
+# Temporary files
 *.tmp
-
-# Compressed files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
 ```
