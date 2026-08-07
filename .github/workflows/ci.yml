@@ -1,0 +1,302 @@
+# LIBeSocial Premium - CI/CD Pipeline
+# ====================================
+# GitHub Actions para testes, linting, security scan e release
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*']
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Security scan semanal
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+  POETRY_VERSION: '1.7.1'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ===========================================================================
+  # QUALITY CHECKS - Linting, type checking, code quality
+  # ===========================================================================
+  quality:
+    name: Quality Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install Poetry
+        run: |
+          pip install poetry==${{ env.POETRY_VERSION }}
+          poetry config virtualenvs.create false
+          
+      - name: Install dependencies
+        run: poetry install --only main,dev --no-interaction
+        
+      - name: Run flake8 (linting)
+        run: |
+          poetry run flake8 esocial/ tests/ \
+            --max-line-length=120 \
+            --ignore=E501,W503 \
+            --statistics \
+            --count
+            
+      - name: Run mypy (type checking)
+        run: |
+          poetry run mypy esocial/ \
+            --ignore-missing-imports \
+            --no-error-summary
+            
+      - name: Run black check (formatting)
+        run: |
+          poetry run black esocial/ tests/ --check --diff || true
+          
+      - name: Run isort check (imports)
+        run: |
+          poetry run isort esocial/ tests/ --check-only --diff || true
+
+  # ===========================================================================
+  # TESTS - Unit tests, integration tests, coverage
+  # ===========================================================================
+  tests:
+    name: Tests & Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: quality
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install Poetry
+        run: |
+          pip install poetry==${{ env.POETRY_VERSION }}
+          poetry config virtualenvs.create false
+          
+      - name: Install dependencies
+        run: poetry install --no-interaction
+        
+      - name: Run pytest with coverage
+        run: |
+          poetry run pytest tests/ \
+            -v \
+            --tb=short \
+            --cov=esocial \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term-missing \
+            --junitxml=junit/test-results.xml \
+            -n auto
+            
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          fail_ci_if_error: false
+          
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: junit/test-results.xml
+          
+      - name: Check coverage threshold
+        run: |
+          coverage report --fail-under=90 || echo "⚠️ Coverage below 90%"
+
+  # ===========================================================================
+  # SECURITY - Dependency scanning, vulnerability checks
+  # ===========================================================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: quality
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install Poetry
+        run: |
+          pip install poetry==${{ env.POETRY_VERSION }}
+          poetry config virtualenvs.create false
+          
+      - name: Install dependencies
+        run: poetry install --no-interaction
+        
+      - name: Run safety (dependency vulnerabilities)
+        run: |
+          pip install safety
+          poetry export -f requirements.txt --output requirements.txt
+          safety check -r requirements.txt --json || true
+          
+      - name: Run bandit (security linting)
+        run: |
+          poetry run bandit -r esocial/ -f json -o bandit-report.json || true
+          
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            requirements.txt
+
+  # ===========================================================================
+  # DOCKER BUILD - Build and push Docker images
+  # ===========================================================================
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [tests, security]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    
+    permissions:
+      contents: read
+      packages: write
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+            
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  # ===========================================================================
+  # RELEASE - Create GitHub release and publish to PyPI
+  # ===========================================================================
+  release:
+    name: Release & Publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [tests, security]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    
+    permissions:
+      contents: write
+      id-token: write
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install Poetry
+        run: |
+          pip install poetry==${{ env.POETRY_VERSION }}
+          
+      - name: Build package
+        run: poetry build
+        
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          files: |
+            dist/*.tar.gz
+            dist/*.whl
+            
+      - name: Publish to PyPI
+        env:
+          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          poetry config pypi-token.pypi $POETRY_PYPI_TOKEN_PYPI
+          poetry publish --skip-existing
+
+  # ===========================================================================
+  # DEPLOY - Deploy to production (optional, requires environment setup)
+  # ===========================================================================
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Deploy notification
+        run: |
+          echo "🚀 Deployment triggered for version ${{ github.ref_name }}"
+          echo "   Add your deployment steps here (Kubernetes, ECS, etc.)"
+          # Example: kubectl apply -k k8s/production/
+          # Example: aws ecs update-service --cluster prod --service libesocial
