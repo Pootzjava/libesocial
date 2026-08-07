@@ -33,6 +33,72 @@ class TargetEnum(str, Enum):
 
 class BatchStatusEnum(str, Enum):
     """Status de um lote de eventos."""
+    PENDING = "PENDENTE"
+    PROCESSING = "PROCESSANDO"
+    SENT = "ENVIADO"
+    SUCCESS = "SUCESSO"
+    ERROR = "ERRO"
+    CANCELLED = "CANCELADO"
+
+
+# ============================================================================
+# Enums for Returns Module (Compatibility)
+# ============================================================================
+
+class EventStatus(str, Enum):
+    """Status for eSocial events (alias for BatchStatusEnum)."""
+    PENDING = "PENDENTE"
+    PROCESSING = "PROCESSANDO"
+    SENT = "ENVIADO"
+    SUCCESS = "SUCESSO"
+    ERROR = "ERRO"
+    CANCELLED = "CANCELADO"
+
+
+class EventType(str, Enum):
+    """Types of eSocial events."""
+    S1000 = "S-1000"  # Informações do Empregador
+    S1010 = "S-1010"  # Tabela de Rubricas
+    S1020 = "S-1020"  # Tabela de Lotações Tributárias
+    S1030 = "S-1030"  # Tabela de Cargos/Empregos
+    S1040 = "S-1040"  # Tabela de Ambientes de Trabalho
+    S1050 = "S-1050"  # Tabela de Horários/Turnos de Trabalho
+    S1060 = "S-1060"  # Tabela de Processos Administrativos/Judiciais
+    S1070 = "S-1070"  # Tabela de Processos com Suspensão de Contribuições
+    S1080 = "S-1080"  # Tabela de Operadores do Sistema
+    S1200 = "S-1200"  # Remuneração de Servidor Público
+    S1210 = "S-1210"  # Pagamentos de Rendimentos do Trabalho
+    S1260 = "S-1260"  # Comercialização da Produção Rural Pessoa Física
+    S1270 = "S-1270"  # Contratação de Trabalhador Avulso Não Portuário
+    S1280 = "S-1280"  # Contribuição Previdenciária do Empregador
+    S1295 = "S-1295"  # Solicitação de Totalizador para Recálculo
+    S1298 = "S-1298"  # Reabertura dos Periódicos
+    S1299 = "S-1299"  # Fechamento dos Periódicos
+    S2200 = "S-2200"  # Admissão/Ingresso de Trabalhador
+    S2205 = "S-2205"  # Alteração de Dados Cadastrais do Trabalhador
+    S2206 = "S-2206"  # Alteração de Contrato de Trabalho
+    S2210 = "S-2210"  # Comunicação de Acidente de Trabalho (CAT)
+    S2220 = "S-2220"  # Monitoramento da Saúde do Trabalhador
+    S2221 = "S-2221"  # Afastamento Temporário
+    S2230 = "S-2230"  # Desligamento
+    S2240 = "S-2240"  # Condições Ambientais do Trabalho - Fatores de Risco
+    S2298 = "S-2298"  # Reintegração
+    S2299 = "S-2299"  # Readmissão
+    S2300 = "S-2300"  # Início de Prestação de Serviços sem Vínculo
+    S2306 = "S-2306"  # Alteração de Dados sem Vínculo Empregatício
+    S2399 = "S-2399"  # Término sem Vínculo Empregatício
+    S2400 = "S-2400"  # Cadastro de Beneficiário Entes Públicos
+    S2405 = "S-2405"  # Alteração de Dados Cadastrais de Beneficiário
+    S2410 = "S-2410"  # Benefício - RPPS
+    S2416 = "S-2416"  # Atualização de Valores de Benefícios
+    S2418 = "S-2418"  # Encerramento de Benefício - RPPS
+    S2500 = "S-2500"  # Progressão e Promoção Funcional
+    S2501 = "S-2501"  # Informação de Período de Trabalho
+    S3000 = "S-3000"  # Exclusão de Informações
+    S3500 = "S-3500"  # Pedido de Clearance Internacional
+    S5001 = "S-5001"  # Evento de Exposição a Agentes Nocivos
+    S5002 = "S-5002"  # Registro de Eventos de Proteção Previdenciária
+    S5003 = "S-5003"  # Monitoramento da Saúde do Trabalhador
     PENDING = 'PENDING'
     SUCCESS = 'SUCCESS'
     FAILED = 'FAILED'
