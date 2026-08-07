@@ -1,20 +1,36 @@
 ```
-# Python
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.egg-info/
-.eggs/
-.venv/
+
+# Coverage
+.coverage
+
+# Dependencies
 venv/
+.venv/
 .env
 .env.local
-.env.*
+*.env.*
 
-# Build/dist files
-build/
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Build artifacts
 dist/
-*.egg
-*.whl
+build/
+*.egg-info/
 ```
