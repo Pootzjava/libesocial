@@ -275,3 +275,64 @@ class HealthStatus(BaseModel):
     circuit_breaker_state: str = 'CLOSED'
     last_check: Optional[datetime] = None
     errors: List[str] = Field(default_factory=list)
+
+
+# =============================================================================
+# Rate Limiter Models (FASE 2)
+# =============================================================================
+
+class RateLimitAlgorithm(str, Enum):
+    """Algoritmos de rate limiting suportados."""
+    TOKEN_BUCKET = 'token_bucket'
+    SLIDING_WINDOW_LOG = 'sliding_window_log'
+    FIXED_WINDOW_COUNTER = 'fixed_window_counter'
+
+
+class RateLimiterConfig(BaseSettings):
+    """Configuração do rate limiter."""
+    algorithm: RateLimitAlgorithm = RateLimitAlgorithm.TOKEN_BUCKET
+    max_requests: int = Field(default=100, ge=1)
+    window_size: float = Field(default=60.0, gt=0)  # seconds
+    refill_rate: Optional[float] = Field(None, gt=0)  # tokens per second (for token bucket)
+    
+    model_config = ConfigDict(
+        env_prefix='ESOCIAL_RATE_LIMIT_',
+        json_schema_extra={
+            'example': {
+                'algorithm': 'token_bucket',
+                'max_requests': 100,
+                'window_size': 60.0,
+                'refill_rate': 1.67  # 100 requests per minute
+            }
+        }
+    )
+    
+    @field_validator('refill_rate')
+    @classmethod
+    def calculate_default_refill_rate(cls, v: Optional[float], info) -> Optional[float]:
+        """Calcula refill rate padrão baseado em max_requests e window_size."""
+        if v is None:
+            # Access data from values or use default calculation
+            return None  # Will be calculated in rate_limiter.py
+        return v
+
+
+class RateLimitResult(BaseModel):
+    """Resultado de uma tentativa de rate limiting."""
+    allowed: bool
+    remaining_tokens: int = Field(..., ge=0)
+    retry_after: Optional[float] = Field(None, ge=0)  # seconds
+    reset_time: datetime
+    algorithm: RateLimitAlgorithm
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    
+    model_config = ConfigDict(json_schema_extra={
+        'example': {
+            'allowed': True,
+            'remaining_tokens': 95,
+            'retry_after': None,
+            'reset_time': '2024-01-01T12:00:00Z',
+            'algorithm': 'token_bucket',
+            'metadata': {'capacity': 100, 'refill_rate': 1.67}
+        }
+    })
