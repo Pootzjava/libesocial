@@ -1,14 +1,3 @@
 ```
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Tests
-.eslintcache
-.nyc_output/
-coverage/
-htmlcov/
-.coverage
+# Configuration and source files only, no build artifacts or dependencies to ignore
 ```
