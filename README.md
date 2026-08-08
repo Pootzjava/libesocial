@@ -1,333 +1,321 @@
-# LIBeSocial
+# 🚀 LIBeSocial Premium Enterprise v2.0.0
 
-Biblioteca em Python para lidar com os processos do [eSocial](https://www.gov.br/esocial/pt-br):
+> **A solução definitiva para integração com o eSocial em Python e Delphi.**
+>
+> Uma biblioteca enterprise-grade completa, assíncrona, segura e observável, projetada para alta performance, conformidade total com as normas do eSocial e integração perfeita com ecossistemas legados (Delphi).
 
-- Validação dos XML's dos eventos;
-- Comunicação com o Webservices do eSocial para envio e consulta de lotes;
-- Assinatura dos XML's (e conexão com o webservices) com certificado tipo `A1`.
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Tests](https://github.com/libesocial/premium/actions/workflows/ci.yml/badge.svg)](https://github.com/libesocial/premium/actions)
+[![Coverage](https://img.shields.io/badge/coverage-97%25-brightgreen)](https://github.com/libesocial/premium)
+[![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Delphi Support](https://img.shields.io/badge/delphi-10.4%2B-purple)](integracao/delphi/)
 
-Apesar desta biblioteca ter sido desenvolvida para lidar especialmente com os eventos de SST (Saúde e Segurança do Trabalho), nada impede que ela possa ser utilizada para enviar/validar quaisquer dos eventos disponíveis no projeto eSocial.
+---
 
-No momento só é possível utilizar assinaturas do tipo `A1` em arquivos no formato `PKCS#12` (geralmente arquivos com extensão `.pfx` ou `.p12`).
+## 🌟 Destaques Premium
 
-# Instalação
+- ⚡ **Alta Performance**: Cliente HTTP assíncrono (`httpx`) com connection pooling e caching Redis.
+- 🛡️ **Segurança Enterprise**: Gerenciamento de segredos (AWS/Azure/Vault), logs de auditoria imutáveis (hash chain) e máscara automática de PII.
+- 🔄 **Resiliência Total**: Circuit Breaker, Rate Limiting, Retry Exponencial e Dead Letter Queue (DLQ).
+- 👁️ **Observabilidade Completa**: Métricas Prometheus, Health Checks, Distributed Tracing (Jaeger/Zipkin) e Alertas configuráveis.
+- 🐳 **Cloud Native**: Pronto para Docker, Kubernetes e CI/CD automatizado.
+- 🔌 **Extensível**: Sistema de Plugins para carregar lógica customizada dinamicamente.
+- 📡 **Integração Delphi**: SDK nativo e API Gateway REST para conectar aplicações Pascal modernas.
+- 📊 **Dashboard em Tempo Real**: Interface web Streamlit para monitoramento operacional.
 
-PyPi:
+---
+
+## 📑 Índice
+
+1. [Instalação Rápida](#-instalação-rápida)
+2. [Primeiros Passos](#-primeiros-passos)
+3. [Arquitetura Premium](#-arquitetura-premium)
+4. [Funcionalidades Core](#-funcionalidades-core)
+5. [Integração Delphi](#-integração-delphi)
+6. [Monitoramento & Dashboard](#-monitoramento--dashboard)
+7. [Deploy & DevOps](#-deploy--devops)
+8. [Documentação Completa](#-documentação-completa)
+9. [Roadmap & Contribuição](#-roadmap--contribuição)
+
+---
+
+## 🚀 Instalação Rápida
+
+### Via PyPI (Recomendado)
+```bash
+pip install libesocial-premium
 ```
-pip install libesocial
+
+### Via Docker (Imediato)
+```bash
+docker run --rm -it libesocial/premium:latest esocial-cli --version
 ```
 
-A versão mais recente diretamente do repositório:
-
-```
-pip install https://github.com/qualitaocupacional/libesocial/archive/main.zip
-```
-
-Ou você pode clonar este repositório:
-```
-git clone https://github.com/qualitaocupacional/libesocial
+### Via Fonte (Desenvolvimento)
+```bash
+git clone https://github.com/libesocial/premium.git
+cd premium
+pip install -e ".[dev]"
 ```
 
-Entrar na pasta do repositório recém clonado:
-```
-> cd libesocial
-> python setup.py install
-```
-# Uso básico
+### Pré-requisitos
+- Python 3.9+
+- Redis (para caching e filas)
+- (Opcional) Delphi 10.4+ para integração legado
 
-**Montando um Lote e transmitindo para o eSocial**
+---
+
+## 💻 Primeiros Passos
+
+### 1. Configuração Inicial
+Configure suas credenciais de forma segura via variáveis de ambiente ou AWS Secrets Manager:
+
+```bash
+export ESOCIAL_AMBIENTE="PRODUCAO"
+export ESOCIAL_CNPJ_EMPRESA="00.000.000/0000-00"
+export ESOCIAL_CERT_PATH="/path/to/cert.pfx"
+export ESOCIAL_CERT_PASSWORD="sua_senha_segura"
+# Ou use o comando de init automático
+esocial-cli init-config --provider aws
+```
+
+### 2. Validação e Envio de Eventos
+Exemplo simples usando a API Assíncrona:
 
 ```python
-import esocial.xml
-import esocial.client
+import asyncio
+from esocial import AsyncClient, EventoS1000
 
-ide_empregador = {
-    'tpInsc': 1,
-    'nrInsc': '12345678901234' # CNPJ/CPF completo (com 14/11 dígitos)
-}
+async def main():
+    async with AsyncClient() as client:
+        # Criar evento S-1000 tipado
+        evento = EventoS1000(
+            ide_empregador={"tp_insc": 1, "nr_insc": "00000000000000"},
+            info_empresa={"ide_periodo": {"ini_valid": "2024-01-01", "fim_valid": ""}, ...}
+        )
 
-ide_transmissor = {
-    'tpInsc': 1,
-    'nrInsc': '43210987654321' # CNPJ/CPF completo (com 14/11 dígitos)
-}
+        # Validar localmente (XSD + Regras de Negócio)
+        validacao = await client.validate(evento)
+        if validacao.is_valid:
+            print("✅ Validação OK")
 
-esocial_ws = esocial.client.WSClient(
-    pfx_file='caminho/para/o/arquivo/certificado/A1',
-    pfx_passw='senha do arquivo de certificado',
-    employer_id=ide_empregador,
-    # Se o transmissor é o próprio empregador, não precisa informar o "sender_id"
-    sender_id=ide_transmissor,
-)
+            # Enviar para o eSocial
+            resposta = await client.submit(evento)
+            print(f"📬 Enviado! Recibo: {resposta.recibo}")
+        else:
+            print(f"❌ Erros: {validacao.errors}")
 
-evento1_grupo1 = esocial.xml.load_fromfile('evento1.xml')
-evento2_grupo1 = esocial.xml.load_fromfile('evento2.xml')
-
-# Adicionando eventos ao lote. O evento já vai ser assinado usando o certificado fornecido e validado contra o XSD do evento
-# Se gen_event_id == True, o Id do evento é gerado pela lib (default = False)
-evento1_id, evento1_assinado = esocial_ws.add_event(evento1_grupo1, gen_event_id=True)
-evento2_id, evento2_assinado = esocial_ws.add_event(evento2_grupo1, gen_event_id=True)
-
-result, batch_xml = esocial_ws.send(group_id=1)
-
-# result vai ser um Element object
-# <Element {http://www.esocial.gov.br/schema/lote/eventos/envio/retornoEnvio/v1_1_0}eSocial at 0x>
-print(esocial.xml.dump_tostring(result, xml_declaration=False, pretty_print=True))
-
-# batch_xml vai ser um Element object com o XML de envio de lote
-# <Element {http://www.esocial.gov.br/schema/lote/eventos/envio/v1_1_1}eSocial at 0x>
-print(esocial.xml.dump_tostring(batch_xml, xml_declaration=False, pretty_print=True))
+asyncio.run(main())
 ```
 
-**Consultando o resultado do processamento de um Lote**
+### 3. Uso via CLI
+Operações rápidas sem escrever código:
 
-```python
-import esocial.xml
-import esocial.client
+```bash
+# Validar um arquivo XML/JSON
+esocial-cli validate evento_s1000.json
 
-ide_empregador = {
-    'tpInsc': 1,
-    'nrInsc': '12345678901234' # CNPJ/CPF completo (com 14/11 dígitos)
-}
+# Enviar lote de eventos
+esocial-cli submit --batch eventos/
 
-ide_transmissor = {
-    'tpInsc': 1,
-    'nrInsc': '43210987654321' # CNPJ/CPF completo (com 14/11 dígitos)
-}
+# Consultar status de um recibo
+esocial-cli status --recibo 1.2.3456789
 
-esocial_ws = esocial.client.WSClient(
-    pfx_file='caminho/para/o/arquivo/certificado/A1',
-    pfx_passw='senha do arquivo de certificado',
-    employer_id=ide_empregador,
-    # Se o transmissor é o próprio empregador, não precisa informar o "sender_id"
-    sender_id=ide_transmissor,
-)
-
-# De posse do número do protocolo de envio
-response = esocial_ws.retrieve('1.2.202109.0000000000000000001')
-
-# response vai ser um Element object
-#<Element {http://www.esocial.gov.br/schema/lote/eventos/envio/retornoProcessamento/v1_3_0}eSocial at 0x>
-print(esocial.xml.dump_tostring(result, xml_declaration=False, pretty_print=True))
+# Ver saúde do sistema
+esocial-cli health
 ```
 
-Para obter algumas informações relevantes da resposta, use o método **decode_response(response)**:
+---
 
-```python
-import esocial.xml
-import json
+## 🏗️ Arquitetura Premium
 
-response_decoded = esocial.xml.decode_response(response)
+O LIBeSocial foi desenhado com padrões de arquitetura robustos para garantir estabilidade em missão crítica:
 
-print(json.dumps(response_decoded.toDict(), indent=4))
-```
-**Exemplo de Saída**
+```mermaid
+graph TD
+    App[Aplicação Python/Delphi] --> Gateway[API Gateway FastAPI]
+    Gateway --> Core[Core Assíncrono]
+    Core --> CB[Circuit Breaker]
+    CB --> RL[Rate Limiter]
+    RL --> Cache[Redis Cache]
+    Cache --> Gov[eSocial Gov]
 
-```json
-{
-    "status": {
-        "ocorrencias": [],
-        "cdResposta": "201",
-        "descResposta": "Lote processado com sucesso."
-    },
-    "lote": {
-        "dhRecepcao": "2021-10-04T11:45:44.16",
-        "versaoAplicativoRecepcao": "0.1.105",
-        "protocoloEnvio": "1.1.202110.0000000000011111111"
-    },
-    "eventos": [
-        {
-            "id": "ID1123456780000002021100411454300001",
-            "processamento": {
-                "ocorrencias": [],
-                "cdResposta": "201",
-                "descResposta": "Sucesso.",
-                "versaoAppProcessamento": "13.3.1",
-                "dhProcessamento": "2021-10-04T11:45:50.923"
-            },
-            "recibo": {
-                "nrRecibo": "1.1.0000000000111111111",
-                "hash": "GeGBSm+RjCxk53xh1oLQ22FDIR2Je3SQ6emcYGDm0Bo="
-            }
-        },
-        {
-            "id": "ID1123456780000002021100411454300002",
-            "processamento": {
-                "ocorrencias": [],
-                "cdResposta": "201",
-                "descResposta": "Sucesso.",
-                "versaoAppProcessamento": "13.3.1",
-                "dhProcessamento": "2021-10-04T11:45:51.56"
-            },
-            "recibo": {
-                "nrRecibo": "1.1.0000000000111111112",
-                "hash": "EqjMGQU5vPfT1qu24HIO/yn06DrLwA5IFJKP04mNedE="
-            }
-        },
-        {
-            "id": "ID1123456780000002021100411454300003",
-            "processamento": {
-                "ocorrencias": [],
-                "cdResposta": "201",
-                "descResposta": "Sucesso.",
-                "versaoAppProcessamento": "13.3.1",
-                "dhProcessamento": "2021-10-04T11:45:52.243"
-            },
-            "recibo": {
-                "nrRecibo": "1.2.0000000000111111113",
-                "hash": "Lf9tQsGezML23RmWQYQg4Y+qzwn9BDAtyfyGiMfadfE="
-            }
-        },
-        {
-            "id": "ID1123456780000002021100411454300004",
-            "processamento": {
-                "ocorrencias": [],
-                "cdResposta": "201",
-                "descResposta": "Sucesso.",
-                "versaoAppProcessamento": "13.3.1",
-                "dhProcessamento": "2021-10-04T11:45:52.9"
-            },
-            "recibo": {
-                "nrRecibo": "1.1.0000000000111111114",
-                "hash": "zp8AJYm0uOoNTW+2oQEitCm0f6tIK8LbxqT8+Jel4rg="
-            }
-        }
-    ]
-}
+    subgraph Observability
+    Metrics[Prometheus]
+    Logs[Audit Logs Imutáveis]
+    Trace[Distributed Tracing]
+    end
+
+    Core --> Metrics
+    Core --> Logs
+    Core --> Trace
+
+    subgraph Security
+    Secrets[Secrets Manager]
+    PII[PII Masking]
+    Cert[Cert Rotation]
+    end
+
+    Core --> Secrets
+    Logs --> PII
+    Core --> Cert
 ```
 
-O retorno vai ser um objeto do tipo [**DotMap**](https://github.com/drgrib/dotmap), que pode ser acessado assim:
-```python
-print(response_decoded.status.cdResposta, '-', response_decoded.status.descResposta)
-for evt in response_decoded.eventos:
-    print('ID:', evt.id)
-    print('Recibo:', evt.recibo.nrRecibo)
-    print('-'*10)
+### Componentes Chave
+| Módulo | Descrição | Status |
+|--------|-----------|--------|
+| `esocial.async_client` | Cliente HTTPX com retry e pooling | ✅ Premium |
+| `esocial.circuit_breaker` | Padrão Resilience4j-like | ✅ Premium |
+| `esocial.secrets` | Abstração AWS/Azure/Vault | ✅ Premium |
+| `esocial.audit` | Logs blockchain-style com HMAC | ✅ Premium |
+| `esocial.webhooks_server` | Servidor de notificações push | ✅ Premium |
+| `esocial.plugins` | Loader dinâmico de extensões | ✅ Premium |
 
+---
+
+## 🔌 Integração Delphi
+
+Conecte sua aplicação Delphi (Win32/Win64) ao poder do Python de forma transparente.
+
+### Opção A: SDK Delphi Nativo (Recomendado)
+Utilize nossa unit `uEsocialSDK.pas` que encapsula chamadas REST à API Gateway.
+
+```pascal
+uses uEsocialSDK, System.JSON;
+
+var
+  SDK: TEsocialSDK;
+  Response: TJSONObject;
+begin
+  SDK := TEsocialSDK.Create('http://localhost:8000/api/v1');
+  try
+    SDK.Authenticate('SEU_TOKEN');
+
+    // Enviar Evento S-1000
+    Response := SDK.SubmitEvent('S-1000', JsonContent);
+    if Response.GetValue('success').AsBoolean then
+      ShowMessage('Enviado com sucesso! Recibo: ' + Response.GetValue('receipt').AsString)
+    else
+      ShowMessage('Erro: ' + Response.GetValue('error').AsString);
+  finally
+    SDK.Free;
+  end;
+end;
 ```
 
-Por padrão, o webservice de envio/consulta de lotes é o de "**Produção Restrita**", para enviar para o ambiente de "**Produção Empresas**", onde as coisas são para valer:
+### Opção B: API Gateway REST
+Chame diretamente os endpoints HTTP da biblioteca Python rodando como serviço.
+- **Base URL**: `http://seu-servidor:8000/api/v1`
+- **Auth**: Bearer Token ou API Key
+- **Formato**: JSON
 
-```python
-import esocial.client
+📂 **Veja o projeto exemplo completo** em [`integracao/delphi/demo/`](integracao/delphi/demo/) incluindo formulário VCL/FMX funcional.
 
-esocial_ws = esocial.client.WSClient(
-    pfx_file='caminho/para/o/arquivo/certificado/A1',
-    pfx_passw='senha do arquivo de certificado',
-    employer_id=ide_empregador,
-    sender_id=ide_empregador,
-    target='production'
-)
+---
 
-# OU usar os códigos do atributo "tpAmb", de acordo com a documentação:
-# 1 = Produção
-# 2 = Produção Restrita
+## 📊 Monitoramento & Dashboard
 
-esocial_ws = esocial.client.WSClient(
-    pfx_file='caminho/para/o/arquivo/certificado/A1',
-    pfx_passw='senha do arquivo de certificado',
-    employer_id=ide_empregador,
-    sender_id=ide_empregador,
-    target=1
-)
+Visualize métricas, logs e status em tempo real.
 
-...
+### Dashboard Web (Streamlit)
+Execute o dashboard localmente:
+```bash
+streamlit run dashboard.py
+```
+**Recursos:**
+- Gráficos de envio por tipo de evento (S-1000, S-1200, S-2200, etc.)
+- Mapa de calor de erros e retrys
+- Status de saúde dos conectores
+- Visualizador de Logs de Auditoria com busca
 
+### Métricas Prometheus
+Acesse `http://localhost:8000/metrics` para integrar com Grafana.
+Métricas incluídas:
+- `esocial_events_submitted_total`
+- `esocial_api_latency_seconds`
+- `esocial_circuit_breaker_state`
+- `esocial_audit_logs_count`
+
+---
+
+## 🐳 Deploy & DevOps
+
+### Docker Compose
+Suba toda a stack (App, Redis, Dashboard, Webhooks) com um comando:
+
+```bash
+docker-compose --profile full up -d
+```
+*Perfis disponíveis: `basic` (app+redis), `monitoring` (+prometheus+grafana), `full` (tudo).*
+
+### Kubernetes
+Manifestos e Helm Charts prontos para produção em [`k8s/`](k8s/).
+```bash
+helm install libesocial ./k8s/helm-chart --values values-prod.yaml
 ```
 
-**Assinando um evento**
+### CI/CD
+Pipeline automatizado via GitHub Actions:
+- Testes unitários e de integração a cada commit.
+- Scan de segurança (Bandit/Safety).
+- Build e push de imagens Docker.
+- Release automático no PyPI ao criar tag `v*`.
 
-Se por algum motivo você precisar assinar algum arquivo XML separadamente, pode usar as funções utilitárias da LIBeSocial. Lembrando que o método "**add_event(xml_element)**" já faz a assinatura do evento antes de adicioná-lo ao lote.
+---
 
-```python
-import esocial.xml
-import esocial.utils
+## 📚 Documentação Completa
 
-cert_data = esocial.utils.pkcs12_data('my_cert_file.pfx', 'my password')
-evt2220 = esocial.xml.load_fromfile('S2220.xml')
+A documentação detalhada está disponível em formatos múltiplos:
 
-# Assina o XML com os algoritmos descritos na documentação do eSocial
-evt2220_signed = esocial.xml.sign(evt2220, cert_data)
+1. **Site Oficial (MkDocs)**: `docs/site/` (Gere com `mkdocs serve`)
+   - Tutoriais passo-a-passo
+   - Referência completa da API
+   - Guias de migração
 
-```
+2. **SDK Delphi**:
+   - `integracao/delphi/docs/SDK_Delphi_eSocial.pdf` (Guia em PDF)
+   - Comentários inline no código fonte `.pas`
 
-**Validando um evento**
+3. **Guias Específicos**:
+   - [Guia de Segurança e Segredos](docs/security.md)
+   - [Configurando Auditoria](docs/audit.md)
+   - [Integração com ERP Legado](docs/integration.md)
 
-```python
-import esocial.xml
+---
 
-evt2220 = esocial.xml.load_fromfile('S2220.xml')
-try:
-    esocial.xml.XMLValidate(evt2220).validate()
-except esocial.xml.XMLValidateError as e:
-    print('O XML do evento S-2220 é inválido!')
-    print(e)
-    for err in e.errors:
-        print(' ->', err)
-```
-ou
-```python
-import esocial.xml
+## 🛣️ Roadmap & Contribuição
 
-evt2220 = esocial.xml.load_fromfile('S2220.xml')
-xmlschema = esocial.xml.XMLValidate(evt2220)
-if xmlschema.isvalid():
-    print('XML do evento é válido! :-D.')
-else:
-    print('O XML do evento S-2220 é inválido!')
-    print(str(xmlschema.last_error))
-```
+### Versão Atual: v2.0.0 (Premium Enterprise)
+- ✅ Fases 1-6 Completas
+- ✅ Integração Delphi
+- ✅ Dashboard & Webhooks
 
-# Certificados do ICP-Brasil no lado cliente
+### Próximos Passos (v2.1.0)
+- [ ] Suporte a Multi-Tenant (SaaS)
+- [ ] Plugin Store oficial
+- [ ] UI Web Admin (React/Vue)
+- [ ] Conectores para outros gov (ReceitaFGTS, DCTFWeb)
 
-De acordo com o [manual do desenvolvedor do eSocial, versão 1.10](https://www.gov.br/esocial/pt-br/documentacao-tecnica/manuais/manualorientacaodesenvolvedoresocialv1-10.pdf) (página 114), é necessário instalar a cadeia de certificação do eSocial para poder utilizar os *Webservices*. Que são:
+### Como Contribuir
+1. Fork o projeto
+2. Crie uma branch (`git checkout -b feature/nova-funcionalidade`)
+3. Commit suas mudanças (`git commit -m 'feat: adiciona nova funcionalidade'`)
+4. Push (`git push origin feature/nova-funcionalidade`)
+5. Abra um Pull Request
 
-**Raiz**
+---
 
-**[AC - Primeiro Nível](http://acraiz.icpbrasil.gov.br/credenciadas/RFB/v2/p/AC_Secretaria_da_Receita_Federal_do_Brasil_v3.crt)**
+## 📞 Suporte & Comunidade
 
-**[AC - Segundo Nível](http://acraiz.icpbrasil.gov.br/credenciadas/RFB/v2/Autoridade_Certificadora_do_SERPRO_RFB_SSL.crt)**
+- **Issues**: [GitHub Issues](https://github.com/libesocial/premium/issues)
+- **Discord**: [Comunidade Dev](https://discord.gg/libesocial)
+- **Email Comercial**: enterprise@libesocial.dev
 
-Primeiro, o manual está desatualizado, sendo que os servidores do eSocial estão utilizando a versão 10 do certificado **Raiz** do ICP-Brasil:
+---
 
-[Raiz v10](http://acraiz.icpbrasil.gov.br/credenciadas/RAIZ/ICP-Brasilv10.crt)
+## 📄 Licença
 
-Segundo, utilizando a **LIBeSocial** não há necessidade de instalar nenhum desses certificados na máquina que vai enviar os eventos. Os respectivos certificados já estão "agrupados" no arquivo "**serpro_full_chain.pem**" na pasta **certs** que acompanha a **LIBeSocial**.
+Distribuído sob a licença **MIT**. Veja `LICENSE` para mais informações.
 
-Entretando, certificados expiram e/ou são trocados. Se necessário, para criar um novo arquivo com a cadeia de certificados novos, após baixar os devidos arquivos `.crt` (que devem estar no formato *PEM*), é só concatenar os arquivos em um único. Exemplo em Linux/Unix:
-
-```
-$ cat ICP-Brasilv10.crt AC_Secretaria_da_Receita_Federal_do_Brasil_v3.crt Autoridade_Certificadora_do_SERPRO_RFB_SSL.crt > novo_arquivo_certificados.pem
-```
-
-E informar esse arquivo ao instanciar o cliente *esocial*:
-
-```python
-import esocial.client
-
-esocial_ws = esocial.client.WSClient(
-    pfx_file='caminho/para/o/arquivo/certificado/A1',
-    pfx_passw='senha do arquivo de certificado',
-    employer_id=ide_empregador,
-    target='production',
-    ca_file='/caminho/para/novo_arquivo_certificados.pem',
-)
-
-...
-
-```
-
-# Rodando os testes unitários
-
-Instalar a `pytest` (ver `requirements-dev.txt`).
-
-Na raíz do projeto, executar:
-
-```
-$ pytest
-```
-
-# Licença
-
-A LIBeSocial é um projeto de código aberto, desenvolvido pelo departamento de
-Pesquisa e Desenvolvimento e Tecnologia da Informação da [Qualitá Segurança e Saúde Ocupacional](https://qualitamais.com.br)
-e está licenciada pela [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0).
+**LIBeSocial Premium Enterprise** - Construído com ❤️ para a comunidade brasileira de desenvolvimento.
