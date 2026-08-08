@@ -1,0 +1,270 @@
+# LIBeSocial Premium - Docker Compose
+# ====================================
+# Produto: LIBeSocial Premium Enterprise v2.0.0
+# Ambientes: development, testing, production
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # DEVELOPMENT - Ambiente de desenvolvimento com hot-reload
+  # ===========================================================================
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: libesocial-dev
+    environment:
+      - ESOCIAL_ENV=development
+      - ESOCIAL_LOG_LEVEL=DEBUG
+      - ESOCIAL_TIMEOUT=60
+      - ESOCIAL_MAX_RETRIES=5
+      - ESOCIAL_CNPJ=${ESOCIAL_CNPJ:-}
+      - ESOCIAL_CERT_PATH=/app/certs
+      - ESOCIAL_CACHE_ENABLED=true
+      - ESOCIAL_REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./esocial:/app/esocial
+      - ./tests:/app/tests
+      - ./certs:/app/certs:ro
+      - dev-venv:/app/.venv
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - libesocial-network
+    command: ["python", "-m", "pytest", "tests/", "-v", "--tb=short", "--watch"]
+    profiles:
+      - development
+
+  # ===========================================================================
+  # TESTING - Ambiente de testes com validações completas
+  # ===========================================================================
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test
+    container_name: libesocial-test
+    environment:
+      - ESOCIAL_ENV=test
+      - ESOCIAL_LOG_LEVEL=INFO
+      - ESOCIAL_TIMEOUT=30
+      - ESOCIAL_MAX_RETRIES=3
+      - ESOCIAL_CACHE_ENABLED=false
+      - PYTEST_ADDOPTS=-v --tb=short --cov=esocial --cov-report=html --cov-report=xml
+    volumes:
+      - ./test-results:/app/test-results
+      - ./coverage:/app/coverage
+    networks:
+      - libesocial-network
+    command: >
+      sh -c "poetry run pytest tests/ -v --tb=short --cov=esocial --cov-report=html:/app/coverage/html --cov-report=xml:/app/coverage/coverage.xml
+      && poetry run flake8 esocial/ tests/ --max-line-length=120
+      && poetry run mypy esocial/ --ignore-missing-imports
+      && echo '✅ All tests and validations passed!'"
+    profiles:
+      - testing
+      - ci
+
+  # ===========================================================================
+  # PRODUCTION - Ambiente de produção otimizado
+  # ===========================================================================
+  prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: libesocial-prod
+    environment:
+      - ESOCIAL_ENV=production
+      - ESOCIAL_LOG_LEVEL=WARNING
+      - ESOCIAL_TIMEOUT=30
+      - ESOCIAL_MAX_RETRIES=3
+      - ESOCIAL_CNPJ=${ESOCIAL_CNPJ:?ESOCIAL_CNPJ required}
+      - ESOCIAL_CERT_PATH=/app/certs
+      - ESOCIAL_CACHE_ENABLED=true
+      - ESOCIAL_REDIS_URL=redis://redis:6379/0
+      - ESOCIAL_SECRETS_PROVIDER=${ESOCIAL_SECRETS_PROVIDER:-env}
+      - ESOCIAL_SECRETS_VAULT_URL=${ESOCIAL_SECRETS_VAULT_URL:-}
+      - ESOCIAL_SECRETS_AWS_REGION=${ESOCIAL_SECRETS_AWS_REGION:-us-east-1}
+    volumes:
+      - ./certs:/app/certs:ro
+      - prod-audit-logs:/app/logs/audit
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - libesocial-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "from esocial import __version__; print(f'Health OK: {__version__}')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    command: ["python", "-m", "esocial.cli", "health"]
+    profiles:
+      - production
+
+  # ===========================================================================
+  # CLI - Execução pontual de comandos CLI
+  # ===========================================================================
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: libesocial-cli
+    environment:
+      - ESOCIAL_ENV=${ESOCIAL_ENV:-production}
+      - ESOCIAL_LOG_LEVEL=${ESOCIAL_LOG_LEVEL:-INFO}
+      - ESOCIAL_CNPJ=${ESOCIAL_CNPJ:-}
+      - ESOCIAL_CERT_PATH=/app/certs
+      - ESOCIAL_REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./certs:/app/certs:ro
+      - ./events:/app/events:ro
+      - ./output:/app/output
+    depends_on:
+      - redis
+    networks:
+      - libesocial-network
+    entrypoint: ["python", "-m", "esocial.cli"]
+    profiles:
+      - cli
+
+  # ===========================================================================
+  # REDIS - Cache e rate limiting
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: libesocial-redis
+    environment:
+      - REDIS_MAXMEMORY=256mb
+      - REDIS_MAXMEMORY_POLICY=allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - libesocial-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    profiles:
+      - development
+      - testing
+      - production
+      - cli
+
+  # ===========================================================================
+  # VAULT (opcional) - HashiCorp Vault para secrets management
+  # ===========================================================================
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: libesocial-vault
+    environment:
+      - VAULT_DEV_ROOT_TOKEN_ID=myroot
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - vault-data:/vault/data
+    networks:
+      - libesocial-network
+    profiles:
+      - development
+      - vault
+
+  # ===========================================================================
+  # PROMETHEUS (opcional) - Monitoramento de métricas
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: libesocial-prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - libesocial-network
+    profiles:
+      - monitoring
+
+  # ===========================================================================
+  # GRAFANA (opcional) - Dashboards de monitoramento
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: libesocial-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - libesocial-network
+    profiles:
+      - monitoring
+
+networks:
+  libesocial-network:
+    driver: bridge
+    name: libesocial-network
+
+volumes:
+  dev-venv:
+    name: libesocial-dev-venv
+  redis-data:
+    name: libesocial-redis-data
+  vault-data:
+    name: libesocial-vault-data
+  prometheus-data:
+    name: libesocial-prometheus-data
+  grafana-data:
+    name: libesocial-grafana-data
+  prod-audit-logs:
+    name: libesocial-prod-audit-logs
+
+# =============================================================================
+# INSTRUÇÕES DE USO:
+# =============================================================================
+# Development mode:
+#   docker-compose --profile development up dev redis
+#
+# Run testes:
+#   docker-compose --profile testing up test
+#
+# Production mode:
+#   docker-compose --profile production up prod redis
+#
+# CLI commands:
+#   docker-compose --profile cli run cli validate events/meu_evento.xml
+#   docker-compose --profile cli run cli submit events/meu_evento.xml
+#   docker-compose --profile cli run cli status ENVIO_123456789
+#   docker-compose --profile cli run cli returns RECEBIMENTO_123
+#   docker-compose --profile cli run cli audit --event-type S-1000
+#   docker-compose --profile cli run cli health
+#
+# Monitoring stack:
+#   docker-compose --profile monitoring up prometheus grafana
+#
+# Full stack (dev + monitoring):
+#   docker-compose --profile development --profile monitoring up
+#
+# Cleanup:
+#   docker-compose down -v  # Remove volumes também
+#   docker-compose down     # Mantém volumes
+# =============================================================================

@@ -1,0 +1,171 @@
+# LIBeSocial Premium - Release Automation
+# ========================================
+# Workflow para versionamento semântico e releases automáticos
+
+name: Release Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Tipo de versão (patch, minor, major)'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      changelog:
+        description: 'Descrição das mudanças'
+        required: false
+        type: string
+
+env:
+  PYTHON_VERSION: '3.11'
+  POETRY_VERSION: '1.7.1'
+
+jobs:
+  # ===========================================================================
+  # VERSION BUMP - Atualizar versão no pyproject.toml
+  # ===========================================================================
+  version:
+    name: Bump Version
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install Poetry
+        run: pip install poetry==${{ env.POETRY_VERSION }}
+        
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+      - name: Bump version
+        id: version
+        run: |
+          # Extrair versão atual
+          CURRENT_VERSION=$(poetry version -s)
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Calcular nova versão baseado no tipo
+          VERSION_TYPE="${{ github.event.inputs.version_type }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          
+          case $VERSION_TYPE in
+            major)
+              NEW_VERSION="$((MAJOR + 1)).0.0"
+              ;;
+            minor)
+              NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
+              ;;
+            patch)
+              NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+              ;;
+          esac
+          
+          echo "New version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          # Atualizar versão no pyproject.toml
+          poetry version $NEW_VERSION
+          
+      - name: Commit and push version bump
+        run: |
+          git add pyproject.toml
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
+          git push origin main
+          
+      - name: Create Git tag
+        run: |
+          git tag -a "v${{ steps.version.outputs.new_version }}" -m "Release v${{ steps.version.outputs.new_version }}"
+          git push origin "v${{ steps.version.outputs.new_version }}"
+
+  # ===========================================================================
+  # CHANGELOG - Gerar changelog automático
+  # ===========================================================================
+  changelog:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    needs: version
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Generate changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          NEW_TAG="v${{ needs.version.outputs.new_version }}"
+          
+          echo "# 🚀 Release $NEW_TAG" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "## Mudanças desde ${PREV_TAG:-início}" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          
+          if [ -n "$PREV_TAG" ]; then
+            echo "### Commits" >> RELEASE_NOTES.md
+            git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD >> RELEASE_NOTES.md
+          else
+            echo "### Commits" >> RELEASE_NOTES.md
+            git log --pretty=format:"- %s (%h)" >> RELEASE_NOTES.md
+          fi
+          
+          echo "" >> RELEASE_NOTES.md
+          echo "## Checklist de Release" >> RELEASE_NOTES.md
+          echo "- [ ] Testes passando" >> RELEASE_NOTES.md
+          echo "- [ ] Documentação atualizada" >> RELEASE_NOTES.md
+          echo "- [ ] Docker image publicada" >> RELEASE_NOTES.md
+          echo "- [ ] PyPI package publicada" >> RELEASE_NOTES.md
+          
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: RELEASE_NOTES.md
+
+  # ===========================================================================
+  # NOTIFY - Notificar sobre o release
+  # ===========================================================================
+  notify:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [version, changelog]
+    
+    steps:
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          
+      - name: Display release info
+        run: |
+          echo "🎉 Release created successfully!"
+          echo ""
+          echo "Version: v${{ needs.version.outputs.new_version }}"
+          echo ""
+          cat RELEASE_NOTES.md
+          
+      - name: Create GitHub Release (draft)
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v${{ needs.version.outputs.new_version }}"
+          body_path: RELEASE_NOTES.md
+          draft: true
+          generate_release_notes: false

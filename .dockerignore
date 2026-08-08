@@ -1,0 +1,121 @@
+# LIBeSocial Premium - .dockerignore
+# ===================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Poetry
+poetry.lock
+.poetry/
+
+# Documentation
+docs/_build/
+site/
+
+# Logs
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Secrets (never include in Docker!)
+certs/*.pem
+certs/*.pfx
+certs/*.p12
+*.key
+*.crt
+
+# Test results
+test-results/
+output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# Docker (avoid recursive copy)
+Dockerfile*
+docker-compose*.yml
+.docker/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Monitoring
+monitoring/
+grafana-data/
+prometheus-data/
+
+# Misc
+README.md
+CHANGELOG.md
+LICENSE
+MANIFEST.in
+setup.cfg
+Makefile
+*.md
+!esocial/**/*.md

@@ -1,0 +1,165 @@
+site_name: LIBeSocial Premium Enterprise
+site_description: Documentação oficial do LIBeSocial - Biblioteca Python Premium para integração com eSocial
+site_author: LIBeSocial Team
+site_url: https://libesocial.readthedocs.io
+
+repo_name: libesocial/libesocial-python
+repo_url: https://github.com/libesocial/libesocial-python
+
+copyright: Copyright &copy; 2024 LIBeSocial Team
+
+theme:
+  name: material
+  language: pt
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.action.edit
+    - content.action.view
+  palette:
+    - scheme: default
+      primary: blue
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/library
+  favicon: assets/favicon.ico
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/libesocial
+    - icon: fontawesome/brands/linkedin
+      link: https://linkedin.com/company/libesocial
+    - icon: fontawesome/solid/envelope
+      link: mailto:suporte@libesocial.com.br
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - meta
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: libesocial
+      repo: libesocial-python
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+nav:
+  - Início:
+    - 'index.md'
+    - 'quickstart.md'
+    - 'installation.md'
+  
+  - Guia de Uso:
+    - 'guide/configuracao.md'
+    - 'guide/validacao.md'
+    - 'guide/envio.md'
+    - 'guide/consulta.md'
+    - 'guide/retornos.md'
+    - 'guide/webhooks.md'
+  
+  - Módulos Premium:
+    - 'premium/circuit-breaker.md'
+    - 'premium/rate-limiter.md'
+    - 'premium/async-client.md'
+    - 'premium/caching.md'
+    - 'premium/monitoring.md'
+    - 'premium/security.md'
+    - 'premium/audit.md'
+  
+  - Integração Delphi:
+    - 'delphi/introducao.md'
+    - 'delphi/sdk.md'
+    - 'delphi/exemplos.md'
+    - 'delphi/api-gateway.md'
+  
+  - Dashboard:
+    - 'dashboard/visao-geral.md'
+    - 'dashboard/funcionalidades.md'
+    - 'dashboard/configuracao.md'
+  
+  - API Reference:
+    - 'api/client.md'
+    - 'api/models.md'
+    - 'api/validators.md'
+    - 'api/utils.md'
+  
+  - Troubleshooting:
+    - 'troubleshooting/common-errors.md'
+    - 'troubleshooting/performance.md'
+    - 'troubleshooting/security.md'
+  
+  - Contribuição:
+    - 'contributing/guidelines.md'
+    - 'contributing/code-style.md'
+    - 'contributing/testing.md'
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+  - minify:
+      minify_html: true
+  - redirects:
+      redirect_maps:
+        'old-page.md': 'new-page.md'
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
